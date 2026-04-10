@@ -294,6 +294,20 @@ class ParserTest {
         assertTrue(error.message!!.contains("Expected '=' after variable name"))
     }
 
+    @Test
+    fun `parses while statement with brace block body`() {
+        val program = parseProgram("""
+        while x < 3 do {
+            y = y + 1
+            x = x + 1
+        }
+    """.trimIndent())
+
+        val stmt = assertIs<Stmt.While>(program.single())
+        val body = assertIs<Stmt.Block>(stmt.body)
+        assertEquals(2, body.statements.size)
+    }
+
     private fun parseExpression(source: String): Expr {
         val tokens = Lexer(source).scanTokens()
         return Parser(tokens).parseExpression()
