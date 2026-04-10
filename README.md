@@ -97,25 +97,29 @@ Supported statement forms:
 - `fun ...`
 - `return`
 
-### Sequences
+## Control Flow
 
-Inline statement sequences use commas:
+`if` supports single-statement and brace-block branches:
 
+```text
+if x > 0 then y = 1 else y = 2
+
+if x > 0 then {
+    y = 1
+    z = 2
+} else {
+    y = 3
+}
+```
+`while` supports inline comma-separated bodies and brace-block bodies:
 ```text
 while x < 3 do y = y + 1, x = x + 1
-```
 
-`while` also supports brace block bodies:
-
-```text
 while x < 3 do {
     y = y + 1
     x = x + 1
 }
 ```
-
-Inside function bodies, statements may be separated by newlines and commas.
-
 ### Conditions
 
 Conditions in `if` and `while` must evaluate to booleans.
