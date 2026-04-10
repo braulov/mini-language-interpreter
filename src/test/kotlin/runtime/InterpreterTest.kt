@@ -164,6 +164,29 @@ class InterpreterTest {
         assertEquals(10, globals["x"])
     }
 
+    @Test
+    fun `interprets nested while loops`() {
+        val program = parseProgram("""
+        x = 0
+        y = 0
+
+        while x < 3 do {
+            z = 0
+            while z < 2 do {
+                y = y + 1
+                z = z + 1
+            }
+            x = x + 1
+        }
+    """.trimIndent())
+
+        val globals = Interpreter().interpret(program)
+
+        assertEquals(3, globals["x"])
+        assertEquals(6, globals["y"])
+        assertEquals(2, globals["z"])
+    }
+
     private fun parseProgram(source: String): List<Stmt> {
         val tokens = Lexer(source).scanTokens()
         return Parser(tokens).parseProgram()

@@ -95,8 +95,13 @@ class Interpreter : Expr.Visitor<Any>, Stmt.Visitor<Unit> {
             TokenType.PLUS -> left.asInt(expr.operator) + right.asInt(expr.operator)
             TokenType.MINUS -> left.asInt(expr.operator) - right.asInt(expr.operator)
             TokenType.STAR -> left.asInt(expr.operator) * right.asInt(expr.operator)
-            TokenType.SLASH -> left.asInt(expr.operator) / right.asInt(expr.operator)
-
+            TokenType.SLASH -> {
+                val divisor = right.asInt(expr.operator)
+                if (divisor == 0) {
+                    throw RuntimeError(expr.operator, "Division by zero.")
+                }
+                left.asInt(expr.operator) / divisor
+            }
             TokenType.EQUAL_EQUAL -> left == right
             TokenType.NOT_EQUAL -> left != right
 

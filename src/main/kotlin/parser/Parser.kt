@@ -96,7 +96,19 @@ class Parser(
     private fun whileStatement(): Stmt.While {
         val condition = expression()
         consume(TokenType.DO, "Expected 'do' after while condition.")
-        val body = parseInlineSequence()
+
+        val body = if (match(TokenType.LEFT_BRACE)) {
+            val block = if (check(TokenType.RIGHT_BRACE)) {
+                Stmt.Block(emptyList())
+            } else {
+                parseBlockBody()
+            }
+            consume(TokenType.RIGHT_BRACE, "Expected '}' after while body.")
+            block
+        } else {
+            parseInlineSequence()
+        }
+
         return Stmt.While(condition, body)
     }
 
