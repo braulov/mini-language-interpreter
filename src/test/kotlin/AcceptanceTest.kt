@@ -1,4 +1,3 @@
-import org.example.runProgram
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

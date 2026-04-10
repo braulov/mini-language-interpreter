@@ -1,8 +1,18 @@
-package org.example
+import lexer.Lexer
+import parser.Parser
+import runtime.Interpreter
 
 fun main() {
-    val program = generateSequence(::readLine).joinToString("\n")
-    println(runProgram(program))
+    val source = generateSequence(::readLine).joinToString("\n")
+    print(runProgram(source))
 }
 
-fun runProgram(source: String): String = TODO("Interpreter is not implemented yet")
+fun runProgram(source: String): String {
+    val tokens = Lexer(source).scanTokens()
+    val program = Parser(tokens).parseProgram()
+    val globals = Interpreter().interpret(program)
+
+    return globals.entries.joinToString("\n") { (name, value) ->
+        "$name: $value"
+    }
+}
