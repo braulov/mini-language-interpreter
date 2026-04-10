@@ -222,7 +222,8 @@ class ParserTest {
         val thenBranch = assertIs<Stmt.Block>(stmt.thenBranch)
         assertEquals(2, thenBranch.statements.size)
 
-        assertIs<Stmt.Assignment>(stmt.elseBranch)
+        val elseBranch = assertIs<Stmt.Block>(stmt.elseBranch)
+        assertEquals(1, elseBranch.statements.size)
     }
 
     @Test
@@ -241,7 +242,7 @@ class ParserTest {
 
         val stmt = assertIs<Stmt.If>(program.single())
         assertIs<Stmt.Block>(stmt.thenBranch)
-        assertIs<Stmt.Assignment>(stmt.elseBranch)
+        assertIs<Stmt.Block>(stmt.elseBranch)
     }
 
     @Test
@@ -309,8 +310,11 @@ class ParserTest {
         assertEquals("add", stmt.name.lexeme)
         assertEquals(listOf("a", "b"), stmt.parameters.map { it.lexeme })
 
-        val body = assertIs<Stmt.Return>(stmt.body)
-        val expr = assertIs<Expr.Binary>(body.value)
+        val body = assertIs<Stmt.Block>(stmt.body)
+        assertEquals(1, body.statements.size)
+
+        val returnStmt = assertIs<Stmt.Return>(body.statements[0])
+        val expr = assertIs<Expr.Binary>(returnStmt.value)
         assertEquals(TokenType.PLUS, expr.operator.type)
     }
 
