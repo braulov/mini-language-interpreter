@@ -1,5 +1,7 @@
 package runtime
 
+import lexer.Token
+
 class Environment(
     private val enclosing: Environment? = null,
 ) {
@@ -9,10 +11,10 @@ class Environment(
         values[name] = value
     }
 
-    fun get(name: String): Any {
-        values[name]?.let { return it }
+    fun get(name: Token): Any {
+        values[name.lexeme]?.let { return it }
         return enclosing?.get(name)
-            ?: throw RuntimeException("Undefined variable '$name'.")
+            ?: throw RuntimeError(name, "Undefined variable '${name.lexeme}'.")
     }
 
     fun snapshot(): Map<String, Any> {

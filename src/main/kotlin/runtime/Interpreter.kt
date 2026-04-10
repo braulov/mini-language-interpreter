@@ -2,6 +2,7 @@ package runtime
 
 import ast.Expr
 import ast.Stmt
+import lexer.Token
 import lexer.TokenType
 
 class Interpreter : Expr.Visitor<Any>, Stmt.Visitor<Unit> {
@@ -15,7 +16,6 @@ class Interpreter : Expr.Visitor<Any>, Stmt.Visitor<Unit> {
         for (statement in program) {
             execute(statement)
         }
-
         return globals.snapshot()
     }
 
@@ -34,8 +34,7 @@ class Interpreter : Expr.Visitor<Any>, Stmt.Visitor<Unit> {
 
     override fun visitIf(stmt: Stmt.If) {
         val condition = evaluate(stmt.condition)
-
-        if (condition.asBoolean()) {
+        if (condition.asBoolean(tokenOf(stmt.condition))) {
             execute(stmt.thenBranch)
         } else {
             execute(stmt.elseBranch)
@@ -43,7 +42,7 @@ class Interpreter : Expr.Visitor<Any>, Stmt.Visitor<Unit> {
     }
 
     override fun visitWhile(stmt: Stmt.While) {
-        while (evaluate(stmt.condition).asBoolean()) {
+        while (evaluate(stmt.condition).asBoolean(tokenOf(stmt.condition))) {
             execute(stmt.body)
         }
     }
@@ -60,7 +59,7 @@ class Interpreter : Expr.Visitor<Any>, Stmt.Visitor<Unit> {
 
     override fun visitReturn(stmt: Stmt.Return) {
         if (!insideFunction) {
-            throw RuntimeException("Return is only allowed inside a function.")
+            throw RuntimeError(stmt.keyword, "Return is only allowed inside a function.")
         }
 
         val value = evaluate(stmt.value)
@@ -68,12 +67,11 @@ class Interpreter : Expr.Visitor<Any>, Stmt.Visitor<Unit> {
     }
 
     override fun visitLiteral(expr: Expr.Literal): Any {
-        return expr.value
-            ?: throw RuntimeException("Null literals are not supported.")
+        return expr.value ?: throw RuntimeException("Null literals are not supported.")
     }
 
     override fun visitVariable(expr: Expr.Variable): Any {
-        return environment.get(expr.name.lexeme)
+        return environment.get(expr.name)
     }
 
     override fun visitGrouping(expr: Expr.Grouping): Any {
@@ -84,8 +82,8 @@ class Interpreter : Expr.Visitor<Any>, Stmt.Visitor<Unit> {
         val right = evaluate(expr.right)
 
         return when (expr.operator.type) {
-            TokenType.MINUS -> -right.asInt()
-            else -> throw RuntimeException("Unsupported unary operator: ${expr.operator.lexeme}")
+            TokenType.MINUS -> -right.asInt(expr.operator)
+            else -> throw RuntimeError(expr.operator, "Unsupported unary operator '${expr.operator.lexeme}'.")
         }
     }
 
@@ -94,36 +92,36 @@ class Interpreter : Expr.Visitor<Any>, Stmt.Visitor<Unit> {
         val right = evaluate(expr.right)
 
         return when (expr.operator.type) {
-            TokenType.PLUS -> left.asInt() + right.asInt()
-            TokenType.MINUS -> left.asInt() - right.asInt()
-            TokenType.STAR -> left.asInt() * right.asInt()
-            TokenType.SLASH -> left.asInt() / right.asInt()
+            TokenType.PLUS -> left.asInt(expr.operator) + right.asInt(expr.operator)
+            TokenType.MINUS -> left.asInt(expr.operator) - right.asInt(expr.operator)
+            TokenType.STAR -> left.asInt(expr.operator) * right.asInt(expr.operator)
+            TokenType.SLASH -> left.asInt(expr.operator) / right.asInt(expr.operator)
 
             TokenType.EQUAL_EQUAL -> left == right
             TokenType.NOT_EQUAL -> left != right
 
-            TokenType.LESS -> left.asInt() < right.asInt()
-            TokenType.LESS_EQUAL -> left.asInt() <= right.asInt()
-            TokenType.GREATER -> left.asInt() > right.asInt()
-            TokenType.GREATER_EQUAL -> left.asInt() >= right.asInt()
+            TokenType.LESS -> left.asInt(expr.operator) < right.asInt(expr.operator)
+            TokenType.LESS_EQUAL -> left.asInt(expr.operator) <= right.asInt(expr.operator)
+            TokenType.GREATER -> left.asInt(expr.operator) > right.asInt(expr.operator)
+            TokenType.GREATER_EQUAL -> left.asInt(expr.operator) >= right.asInt(expr.operator)
 
-            else -> throw RuntimeException("Unsupported binary operator: ${expr.operator.lexeme}")
+            else -> throw RuntimeError(expr.operator, "Unsupported binary operator '${expr.operator.lexeme}'.")
         }
     }
 
     override fun visitCall(expr: Expr.Call): Any {
         val function = functions[expr.callee.lexeme]
-            ?: throw RuntimeException("Undefined function '${expr.callee.lexeme}'.")
+            ?: throw RuntimeError(expr.callee, "Undefined function '${expr.callee.lexeme}'.")
 
         if (expr.arguments.size != function.parameters.size) {
-            throw RuntimeException(
-                "Function '${function.name.lexeme}' expected ${function.parameters.size} arguments but got ${expr.arguments.size}."
+            throw RuntimeError(
+                expr.callee,
+                "Function '${function.name.lexeme}' expected ${function.parameters.size} arguments but got ${expr.arguments.size}.",
             )
         }
 
         val callerEnvironment = environment
         val callerInsideFunction = insideFunction
-
         val localEnvironment = Environment(globals)
 
         for ((parameter, argumentExpression) in function.parameters.zip(expr.arguments)) {
@@ -134,14 +132,24 @@ class Interpreter : Expr.Visitor<Any>, Stmt.Visitor<Unit> {
         return try {
             environment = localEnvironment
             insideFunction = true
-
             execute(function.body)
-            throw RuntimeException("Function '${function.name.lexeme}' did not return a value.")
+            throw RuntimeError(function.name, "Function '${function.name.lexeme}' did not return a value.")
         } catch (signal: ReturnSignal) {
             signal.value
         } finally {
             environment = callerEnvironment
             insideFunction = callerInsideFunction
+        }
+    }
+
+    private fun tokenOf(expr: Expr): Token {
+        return when (expr) {
+            is Expr.Variable -> expr.name
+            is Expr.Unary -> expr.operator
+            is Expr.Binary -> expr.operator
+            is Expr.Call -> expr.callee
+            is Expr.Grouping -> tokenOf(expr.expression)
+            is Expr.Literal -> Token(TokenType.INT, "<literal>", expr.value, 0)
         }
     }
 }
@@ -150,12 +158,12 @@ private class ReturnSignal(
     val value: Any,
 ) : RuntimeException(null, null, false, false)
 
-private fun Any.asInt(): Int {
+private fun Any.asInt(token: Token): Int {
     return this as? Int
-        ?: throw RuntimeException("Expected integer value, got ${this::class.simpleName}.")
+        ?: throw RuntimeError(token, "Expected integer value, got ${this::class.simpleName}.")
 }
 
-private fun Any.asBoolean(): Boolean {
+private fun Any.asBoolean(token: Token): Boolean {
     return this as? Boolean
-        ?: throw RuntimeException("Expected boolean value, got ${this::class.simpleName}.")
+        ?: throw RuntimeError(token, "Expected boolean value, got ${this::class.simpleName}.")
 }

@@ -43,7 +43,7 @@ class Lexer(
                 if (match('=')) {
                     addToken(TokenType.NOT_EQUAL)
                 } else {
-                    throw IllegalArgumentException("Unexpected character '!' at line $line")
+                    throw LexerException(line, "Unexpected character '!'.")
                 }
             }
             '<' -> addToken(if (match('=')) TokenType.LESS_EQUAL else TokenType.LESS)
@@ -59,7 +59,7 @@ class Lexer(
             else -> when {
                 c.isDigit() -> number()
                 isIdentifierStart(c) -> identifier()
-                else -> throw IllegalArgumentException("Unexpected character '$c' at line $line")
+                else -> throw LexerException(line, "Unexpected character '$c'.")
             }
         }
     }
@@ -74,30 +74,22 @@ class Lexer(
         )
     }
 
-    private fun advance(): Char {
-        return source[current++]
-    }
+    private fun advance(): Char = source[current++]
 
     private fun match(expected: Char): Boolean {
         if (isAtEnd()) return false
         if (source[current] != expected) return false
-
         current++
         return true
     }
 
-    private fun peek(): Char? {
-        return if (isAtEnd()) null else source[current]
-    }
+    private fun peek(): Char? = if (isAtEnd()) null else source[current]
 
-    private fun peekNext(): Char? {
-        return if (current + 1 >= source.length) null else source[current + 1]
-    }
+    private fun peekNext(): Char? =
+        if (current + 1 >= source.length) null else source[current + 1]
 
     private fun number() {
-        while (peek()?.isDigit() == true) {
-            advance()
-        }
+        while (peek()?.isDigit() == true) advance()
 
         val lexeme = source.substring(start, current)
         addToken(
@@ -116,17 +108,11 @@ class Lexer(
         addToken(type)
     }
 
-    private fun isAtEnd(): Boolean {
-        return current >= source.length
-    }
+    private fun isAtEnd(): Boolean = current >= source.length
 
-    private fun isIdentifierStart(c: Char): Boolean {
-        return c.isLetter() || c == '_'
-    }
+    private fun isIdentifierStart(c: Char): Boolean = c.isLetter() || c == '_'
 
-    private fun isIdentifierPart(c: Char): Boolean {
-        return c.isLetterOrDigit() || c == '_'
-    }
+    private fun isIdentifierPart(c: Char): Boolean = c.isLetterOrDigit() || c == '_'
 
     private companion object {
         val keywords = mapOf(
@@ -142,3 +128,8 @@ class Lexer(
         )
     }
 }
+
+class LexerException(
+    line: Int,
+    message: String,
+) : RuntimeException("Lexer error at line $line: $message")

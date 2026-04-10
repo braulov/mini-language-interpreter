@@ -124,17 +124,10 @@ class Parser(
         return asBlockIfNeeded(statements)
     }
 
-    private fun asBlockIfNeeded(statements: List<Stmt>): Stmt {
-        return if (statements.size == 1) {
-            statements.single()
-        } else {
-            Stmt.Block(statements)
-        }
-    }
+    private fun asBlockIfNeeded(statements: List<Stmt>): Stmt =
+        if (statements.size == 1) statements.single() else Stmt.Block(statements)
 
-    private fun expression(): Expr {
-        return equality()
-    }
+    private fun expression(): Expr = equality()
 
     private fun equality(): Expr {
         var expr = comparison()
@@ -214,7 +207,7 @@ class Parser(
 
     private fun finishCall(calleeExpr: Expr): Expr {
         val callee = calleeExpr as? Expr.Variable
-            ?: throw ParseException("Only named function calls are supported.")
+            ?: throw errorAt(previous(), "Only named function calls are supported.")
 
         val arguments = mutableListOf<Expr>()
 
@@ -232,35 +225,23 @@ class Parser(
         when {
             match(TokenType.FALSE) -> return Expr.Literal(false)
             match(TokenType.TRUE) -> return Expr.Literal(true)
-
-            match(TokenType.INT) -> {
-                return Expr.Literal(previous().literal)
-            }
-
-            match(TokenType.IDENTIFIER) -> {
-                return Expr.Variable(previous())
-            }
-
+            match(TokenType.INT) -> return Expr.Literal(previous().literal)
+            match(TokenType.IDENTIFIER) -> return Expr.Variable(previous())
             match(TokenType.LEFT_PAREN) -> {
                 val expr = expression()
                 consume(TokenType.RIGHT_PAREN, "Expected ')' after expression.")
                 return Expr.Grouping(expr)
             }
-
-            else -> throw ParseException("Expected expression, found ${peek().type}.")
+            else -> throw errorAt(peek(), "Expected expression.")
         }
     }
 
     private fun skipNewlines() {
-        while (match(TokenType.NEWLINE)) {
-            // skip
-        }
+        while (match(TokenType.NEWLINE)) Unit
     }
 
     private fun skipSeparators() {
-        while (match(TokenType.NEWLINE, TokenType.COMMA)) {
-            // skip
-        }
+        while (match(TokenType.NEWLINE, TokenType.COMMA)) Unit
     }
 
     private fun match(vararg types: TokenType): Boolean {
@@ -275,29 +256,28 @@ class Parser(
 
     private fun consume(type: TokenType, message: String): Token {
         if (check(type)) return advance()
-        throw ParseException(message)
+        throw errorAt(peek(), message)
     }
 
-    private fun check(type: TokenType): Boolean {
-        return peek().type == type
-    }
+    private fun check(type: TokenType): Boolean = peek().type == type
 
     private fun advance(): Token {
         if (!isAtEnd()) current++
         return previous()
     }
 
-    private fun isAtEnd(): Boolean {
-        return peek().type == TokenType.EOF
-    }
+    private fun isAtEnd(): Boolean = peek().type == TokenType.EOF
 
-    private fun peek(): Token {
-        return tokens[current]
-    }
+    private fun peek(): Token = tokens[current]
 
-    private fun previous(): Token {
-        return tokens[current - 1]
+    private fun previous(): Token = tokens[current - 1]
+
+    private fun errorAt(token: Token, message: String): ParseException {
+        return ParseException(token.line, message)
     }
 }
 
-class ParseException(message: String) : RuntimeException(message)
+class ParseException(
+    line: Int,
+    message: String,
+) : RuntimeException("Parse error at line $line: $message")
