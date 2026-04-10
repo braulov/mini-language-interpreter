@@ -191,6 +191,60 @@ class ParserTest {
     }
 
     @Test
+    fun `parses multiline nested if statements`() {
+        val program = parseProgram("""
+            if true then
+                if false then x = 1 else x = 2
+            else
+                x = 3
+        """.trimIndent())
+
+        val outer = assertIs<Stmt.If>(program.single())
+        val inner = assertIs<Stmt.If>(outer.thenBranch)
+        assertIs<Stmt.Assignment>(inner.thenBranch)
+        assertIs<Stmt.Assignment>(inner.elseBranch)
+        assertIs<Stmt.Assignment>(outer.elseBranch)
+    }
+
+    @Test
+    fun `parses if statement with brace block branches`() {
+        val program = parseProgram("""
+            if x > 0 then {
+                y = 1
+                z = 2
+            } else {
+                y = 3
+            }
+        """.trimIndent())
+
+        val stmt = assertIs<Stmt.If>(program.single())
+
+        val thenBranch = assertIs<Stmt.Block>(stmt.thenBranch)
+        assertEquals(2, thenBranch.statements.size)
+
+        assertIs<Stmt.Assignment>(stmt.elseBranch)
+    }
+
+    @Test
+    fun `parses multiline if with brace blocks after then and else`() {
+        val program = parseProgram("""
+            if true then
+            {
+                x = 1
+                y = 2
+            }
+            else
+            {
+                x = 3
+            }
+        """.trimIndent())
+
+        val stmt = assertIs<Stmt.If>(program.single())
+        assertIs<Stmt.Block>(stmt.thenBranch)
+        assertIs<Stmt.Assignment>(stmt.elseBranch)
+    }
+
+    @Test
     fun `parses while with comma sequence body as block`() {
         val program = parseProgram("while x < 3 do y = y + 1, x = x + 1")
 
@@ -202,6 +256,18 @@ class ParserTest {
 
         assertIs<Stmt.Assignment>(body.statements[0])
         assertIs<Stmt.Assignment>(body.statements[1])
+    }
+
+    @Test
+    fun `parses while body after newline`() {
+        val program = parseProgram("""
+            while x < 3 do
+                y = y + 1, x = x + 1
+        """.trimIndent())
+
+        val stmt = assertIs<Stmt.While>(program.single())
+        val body = assertIs<Stmt.Block>(stmt.body)
+        assertEquals(2, body.statements.size)
     }
 
     @Test

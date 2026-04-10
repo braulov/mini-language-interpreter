@@ -42,6 +42,55 @@ class InterpreterTest {
     }
 
     @Test
+    fun `interprets nested if statements`() {
+        val globals = interpret("""
+            x = 10
+            y = 0
+
+            if x > 5 then
+                if x > 8 then y = 1 else y = 2
+            else
+                y = 3
+        """.trimIndent())
+
+        assertEquals(10, globals["x"])
+        assertEquals(1, globals["y"])
+    }
+
+    @Test
+    fun `interprets nested if else branches correctly`() {
+        val globals = interpret("""
+            x = 7
+            y = 0
+
+            if x > 5 then
+                if x > 8 then y = 1 else y = 2
+            else
+                y = 3
+        """.trimIndent())
+
+        assertEquals(7, globals["x"])
+        assertEquals(2, globals["y"])
+    }
+
+    @Test
+    fun `interprets if statement with brace block branches`() {
+        val globals = interpret("""
+            x = 10
+            if x > 5 then {
+                y = 1
+                z = 2
+            } else {
+                y = 3
+            }
+        """.trimIndent())
+
+        assertEquals(10, globals["x"])
+        assertEquals(1, globals["y"])
+        assertEquals(2, globals["z"])
+    }
+
+    @Test
     fun `interprets while loop with comma sequence body`() {
         val globals = interpret("""
             x = 0
@@ -88,6 +137,57 @@ class InterpreterTest {
         assertEquals(3, globals["x"])
         assertEquals(6, globals["y"])
         assertEquals(2, globals["z"])
+    }
+
+    @Test
+    fun `interprets nested ifs with nested while loops`() {
+        val globals = interpret("""
+            x = 0
+            y = 0
+
+            if true then
+                if true then
+                    while x < 3 do {
+                        z = 0
+                        while z < 2 do {
+                            y = y + 1
+                            z = z + 1
+                        }
+                        x = x + 1
+                    }
+                else
+                    y = 100
+            else
+                y = 200
+        """.trimIndent())
+
+        assertEquals(3, globals["x"])
+        assertEquals(6, globals["y"])
+        assertEquals(2, globals["z"])
+    }
+
+    @Test
+    fun `interprets nested if and while with brace blocks`() {
+        val globals = interpret("""
+            x = 0
+            y = 0
+
+            if true then {
+                while x < 3 do {
+                    if x == 1 then {
+                        y = y + 10
+                    } else {
+                        y = y + 1
+                    }
+                    x = x + 1
+                }
+            } else {
+                y = 100
+            }
+        """.trimIndent())
+
+        assertEquals(3, globals["x"])
+        assertEquals(12, globals["y"])
     }
 
     @Test

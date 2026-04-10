@@ -87,9 +87,12 @@ class Parser(
     private fun ifStatement(): Stmt.If {
         val condition = expression()
         consume(TokenType.THEN, "Expected 'then' after if condition.")
-        val thenBranch = statement()
+        val thenBranch = parseBranch()
+
+        skipNewlines()
         consume(TokenType.ELSE, "Expected 'else' after then branch.")
-        val elseBranch = statement()
+        val elseBranch = parseBranch()
+
         return Stmt.If(condition, thenBranch, elseBranch)
     }
 
@@ -115,6 +118,23 @@ class Parser(
         return Stmt.While(condition, body)
     }
 
+    private fun parseBranch(): Stmt {
+        skipNewlines()
+
+        return if (match(TokenType.LEFT_BRACE)) {
+            val block = if (check(TokenType.RIGHT_BRACE)) {
+                Stmt.Block(emptyList())
+            } else {
+                parseBlockBody()
+            }
+
+            consume(TokenType.RIGHT_BRACE, "Expected '}' after branch.")
+            block
+        } else {
+            statement()
+        }
+    }
+
     private fun returnStatement(): Stmt.Return {
         val keyword = previous()
         val value = expression()
@@ -129,6 +149,8 @@ class Parser(
     }
 
     private fun parseInlineSequence(): Stmt {
+        skipNewlines()
+
         val statements = mutableListOf<Stmt>()
         statements += statement()
 
@@ -140,11 +162,7 @@ class Parser(
     }
 
     private fun asBlockIfNeeded(statements: List<Stmt>): Stmt {
-        return if (statements.size == 1) {
-            statements.single()
-        } else {
-            Stmt.Block(statements)
-        }
+        return if (statements.size == 1) statements.single() else Stmt.Block(statements)
     }
 
     private fun expression(): Expr = equality()
@@ -273,15 +291,11 @@ class Parser(
     }
 
     private fun skipNewlines() {
-        while (match(TokenType.NEWLINE)) {
-            // skip
-        }
+        while (match(TokenType.NEWLINE)) Unit
     }
 
     private fun skipSeparators() {
-        while (match(TokenType.NEWLINE, TokenType.COMMA)) {
-            // skip
-        }
+        while (match(TokenType.NEWLINE, TokenType.COMMA)) Unit
     }
 
     private fun match(vararg types: TokenType): Boolean {
@@ -299,26 +313,18 @@ class Parser(
         throw errorAt(peek(), message)
     }
 
-    private fun check(type: TokenType): Boolean {
-        return peek().type == type
-    }
+    private fun check(type: TokenType): Boolean = peek().type == type
 
     private fun advance(): Token {
         if (!isAtEnd()) current++
         return previous()
     }
 
-    private fun isAtEnd(): Boolean {
-        return peek().type == TokenType.EOF
-    }
+    private fun isAtEnd(): Boolean = peek().type == TokenType.EOF
 
-    private fun peek(): Token {
-        return tokens[current]
-    }
+    private fun peek(): Token = tokens[current]
 
-    private fun previous(): Token {
-        return tokens[current - 1]
-    }
+    private fun previous(): Token = tokens[current - 1]
 
     private fun errorAt(token: Token, message: String): ParseException {
         return ParseException(token.line, message)

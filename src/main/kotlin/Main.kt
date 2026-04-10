@@ -1,9 +1,15 @@
+import java.io.File
 import lexer.Lexer
 import parser.Parser
 import runtime.Interpreter
 
-fun main() {
-    val source = generateSequence(::readLine).joinToString("\n")
+fun main(args: Array<String>) {
+    val source = when (args.size) {
+        0 -> generateSequence(::readLine).joinToString("\n")
+        1 -> File(args[0]).readText()
+        else -> error("Expected zero or one argument: [path-to-source-file]")
+    }
+
     print(runProgram(source))
 }
 

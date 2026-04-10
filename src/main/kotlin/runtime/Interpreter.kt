@@ -69,8 +69,7 @@ class Interpreter : Expr.Visitor<Any>, Stmt.Visitor<Unit> {
     }
 
     override fun visitLiteral(expr: Expr.Literal): Any {
-        return expr.value
-            ?: throw RuntimeException("Null literals are not supported.")
+        return expr.value ?: throw RuntimeException("Null literals are not supported.")
     }
 
     override fun visitVariable(expr: Expr.Variable): Any {
