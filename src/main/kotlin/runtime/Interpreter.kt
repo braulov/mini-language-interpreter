@@ -19,9 +19,9 @@ class Interpreter {
         when (statement) {
             is Stmt.Assignment -> executeAssignment(statement)
             is Stmt.If -> executeIf(statement)
+            is Stmt.While -> executeWhile(statement)
+            is Stmt.Block -> executeBlock(statement)
 
-            is Stmt.Block,
-            is Stmt.While,
             is Stmt.Function,
             is Stmt.Return -> {
                 throw UnsupportedOperationException(
@@ -43,6 +43,18 @@ class Interpreter {
             execute(statement.thenBranch)
         } else {
             execute(statement.elseBranch)
+        }
+    }
+
+    private fun executeWhile(statement: Stmt.While) {
+        while (evaluate(statement.condition).asBoolean()) {
+            execute(statement.body)
+        }
+    }
+
+    private fun executeBlock(statement: Stmt.Block) {
+        for (nested in statement.statements) {
+            execute(nested)
         }
     }
 
