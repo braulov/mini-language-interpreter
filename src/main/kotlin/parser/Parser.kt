@@ -1,6 +1,7 @@
 package parser
 
 import ast.Expr
+import ast.Stmt
 import lexer.Token
 import lexer.TokenType
 
@@ -9,10 +10,126 @@ class Parser(
 ) {
     private var current = 0
 
+    fun parseProgram(): List<Stmt> {
+        val statements = mutableListOf<Stmt>()
+
+        skipNewlines()
+
+        while (!isAtEnd()) {
+            statements += declaration()
+            skipNewlines()
+        }
+
+        consume(TokenType.EOF, "Expected end of program.")
+        return statements
+    }
+
     fun parseExpression(): Expr {
         val expression = expression()
         consume(TokenType.EOF, "Expected end of expression.")
         return expression
+    }
+
+    private fun declaration(): Stmt {
+        return if (match(TokenType.FUN)) {
+            functionDeclaration()
+        } else {
+            statement()
+        }
+    }
+
+    private fun functionDeclaration(): Stmt.Function {
+        val name = consume(TokenType.IDENTIFIER, "Expected function name.")
+        consume(TokenType.LEFT_PAREN, "Expected '(' after function name.")
+
+        val parameters = mutableListOf<Token>()
+        if (!check(TokenType.RIGHT_PAREN)) {
+            do {
+                parameters += consume(TokenType.IDENTIFIER, "Expected parameter name.")
+            } while (match(TokenType.COMMA))
+        }
+
+        consume(TokenType.RIGHT_PAREN, "Expected ')' after parameters.")
+        consume(TokenType.LEFT_BRACE, "Expected '{' before function body.")
+
+        val body = if (check(TokenType.RIGHT_BRACE)) {
+            Stmt.Block(emptyList())
+        } else {
+            parseBlockBody()
+        }
+
+        consume(TokenType.RIGHT_BRACE, "Expected '}' after function body.")
+        return Stmt.Function(name, parameters, body)
+    }
+
+    private fun parseBlockBody(): Stmt {
+        val statements = mutableListOf<Stmt>()
+
+        skipSeparators()
+
+        while (!check(TokenType.RIGHT_BRACE) && !isAtEnd()) {
+            statements += statement()
+            skipSeparators()
+        }
+
+        return asBlockIfNeeded(statements)
+    }
+
+    private fun statement(): Stmt {
+        return when {
+            match(TokenType.IF) -> ifStatement()
+            match(TokenType.WHILE) -> whileStatement()
+            match(TokenType.RETURN) -> returnStatement()
+            else -> assignmentStatement()
+        }
+    }
+
+    private fun ifStatement(): Stmt.If {
+        val condition = expression()
+        consume(TokenType.THEN, "Expected 'then' after if condition.")
+        val thenBranch = statement()
+        consume(TokenType.ELSE, "Expected 'else' after then branch.")
+        val elseBranch = statement()
+        return Stmt.If(condition, thenBranch, elseBranch)
+    }
+
+    private fun whileStatement(): Stmt.While {
+        val condition = expression()
+        consume(TokenType.DO, "Expected 'do' after while condition.")
+        val body = parseInlineSequence()
+        return Stmt.While(condition, body)
+    }
+
+    private fun returnStatement(): Stmt.Return {
+        val keyword = previous()
+        val value = expression()
+        return Stmt.Return(keyword, value)
+    }
+
+    private fun assignmentStatement(): Stmt.Assignment {
+        val name = consume(TokenType.IDENTIFIER, "Expected variable name.")
+        consume(TokenType.ASSIGN, "Expected '=' after variable name.")
+        val value = expression()
+        return Stmt.Assignment(name, value)
+    }
+
+    private fun parseInlineSequence(): Stmt {
+        val statements = mutableListOf<Stmt>()
+        statements += statement()
+
+        while (match(TokenType.COMMA)) {
+            statements += statement()
+        }
+
+        return asBlockIfNeeded(statements)
+    }
+
+    private fun asBlockIfNeeded(statements: List<Stmt>): Stmt {
+        return if (statements.size == 1) {
+            statements.single()
+        } else {
+            Stmt.Block(statements)
+        }
     }
 
     private fun expression(): Expr {
@@ -34,7 +151,8 @@ class Parser(
     private fun comparison(): Expr {
         var expr = term()
 
-        while (match(
+        while (
+            match(
                 TokenType.LESS,
                 TokenType.LESS_EQUAL,
                 TokenType.GREATER,
@@ -133,6 +251,18 @@ class Parser(
         }
     }
 
+    private fun skipNewlines() {
+        while (match(TokenType.NEWLINE)) {
+            // skip
+        }
+    }
+
+    private fun skipSeparators() {
+        while (match(TokenType.NEWLINE, TokenType.COMMA)) {
+            // skip
+        }
+    }
+
     private fun match(vararg types: TokenType): Boolean {
         for (type in types) {
             if (check(type)) {
@@ -149,7 +279,6 @@ class Parser(
     }
 
     private fun check(type: TokenType): Boolean {
-        if (isAtEnd()) return type == TokenType.EOF
         return peek().type == type
     }
 

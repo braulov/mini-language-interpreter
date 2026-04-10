@@ -1,6 +1,7 @@
 package parser
 
 import ast.Expr
+import ast.Stmt
 import lexer.Lexer
 import lexer.TokenType
 import kotlin.test.Test
@@ -105,8 +106,119 @@ class ParserTest {
         assertEquals(3, third.value)
     }
 
+    @Test
+    fun `parses assignment statement`() {
+        val program = parseProgram("x = 42")
+
+        assertEquals(1, program.size)
+
+        val stmt = assertIs<Stmt.Assignment>(program[0])
+        assertEquals("x", stmt.name.lexeme)
+
+        val value = assertIs<Expr.Literal>(stmt.value)
+        assertEquals(42, value.value)
+    }
+
+    @Test
+    fun `parses if statement`() {
+        val program = parseProgram("if true then x = 1 else x = 2")
+
+        assertEquals(1, program.size)
+
+        val stmt = assertIs<Stmt.If>(program[0])
+
+        val condition = assertIs<Expr.Literal>(stmt.condition)
+        assertEquals(true, condition.value)
+
+        val thenBranch = assertIs<Stmt.Assignment>(stmt.thenBranch)
+        assertEquals("x", thenBranch.name.lexeme)
+
+        val elseBranch = assertIs<Stmt.Assignment>(stmt.elseBranch)
+        assertEquals("x", elseBranch.name.lexeme)
+    }
+
+    @Test
+    fun `parses while with comma sequence body as block`() {
+        val program = parseProgram("while x < 3 do y = y + 1, x = x + 1")
+
+        assertEquals(1, program.size)
+
+        val stmt = assertIs<Stmt.While>(program[0])
+        val body = assertIs<Stmt.Block>(stmt.body)
+        assertEquals(2, body.statements.size)
+
+        assertIs<Stmt.Assignment>(body.statements[0])
+        assertIs<Stmt.Assignment>(body.statements[1])
+    }
+
+    @Test
+    fun `parses function declaration`() {
+        val program = parseProgram("fun add(a, b) { return a + b }")
+
+        assertEquals(1, program.size)
+
+        val stmt = assertIs<Stmt.Function>(program[0])
+        assertEquals("add", stmt.name.lexeme)
+        assertEquals(listOf("a", "b"), stmt.parameters.map { it.lexeme })
+
+        val body = assertIs<Stmt.Return>(stmt.body)
+        val expr = assertIs<Expr.Binary>(body.value)
+        assertEquals(TokenType.PLUS, expr.operator.type)
+    }
+
+    @Test
+    fun `parses multi statement function body as block`() {
+        val program = parseProgram("""
+            fun f(n) {
+                x = 1
+                return n
+            }
+        """.trimIndent())
+
+        assertEquals(1, program.size)
+
+        val function = assertIs<Stmt.Function>(program[0])
+        val body = assertIs<Stmt.Block>(function.body)
+        assertEquals(2, body.statements.size)
+        assertIs<Stmt.Assignment>(body.statements[0])
+        assertIs<Stmt.Return>(body.statements[1])
+    }
+
+    @Test
+    fun `parses top level declarations separated by newlines`() {
+        val program = parseProgram("""
+            x = 1
+            y = 2
+        """.trimIndent())
+
+        assertEquals(2, program.size)
+        assertIs<Stmt.Assignment>(program[0])
+        assertIs<Stmt.Assignment>(program[1])
+    }
+
+    @Test
+    fun `parses sample while if body with correct outer sequencing`() {
+        val program = parseProgram("""
+            while x < 3 do if x == 1 then y = 10 else y = y + 1, x = x + 1
+        """.trimIndent())
+
+        assertEquals(1, program.size)
+
+        val whileStmt = assertIs<Stmt.While>(program[0])
+        val body = assertIs<Stmt.Block>(whileStmt.body)
+        assertEquals(2, body.statements.size)
+
+        assertIs<Stmt.If>(body.statements[0])
+        assertIs<Stmt.Assignment>(body.statements[1])
+    }
+
     private fun parseExpression(source: String): Expr {
         val tokens = Lexer(source).scanTokens()
         return Parser(tokens).parseExpression()
+    }
+
+    private fun parseProgram(source: String): List<Stmt> {
+        val tokens = Lexer(source).scanTokens()
+        return Parser(tokens).parseProgram()
     }
 }
