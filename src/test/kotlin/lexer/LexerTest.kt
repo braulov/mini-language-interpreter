@@ -2,6 +2,8 @@ package lexer
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class LexerTest {
 
@@ -144,6 +146,72 @@ class LexerTest {
             TokenType.INT,
             TokenType.EOF,
         )
+    }
+    @Test
+    fun `scans identifiers with underscores and digits`() {
+        val tokens = Lexer("foo_bar x1 _tmp").scanTokens()
+
+        assertTokenTypes(
+            tokens,
+            TokenType.IDENTIFIER,
+            TokenType.IDENTIFIER,
+            TokenType.IDENTIFIER,
+            TokenType.EOF,
+        )
+
+        assertEquals("foo_bar", tokens[0].lexeme)
+        assertEquals("x1", tokens[1].lexeme)
+        assertEquals("_tmp", tokens[2].lexeme)
+    }
+
+    @Test
+    fun `distinguishes keywords from identifiers`() {
+        val tokens = Lexer("if iff true truex while while1").scanTokens()
+
+        assertTokenTypes(
+            tokens,
+            TokenType.IF,
+            TokenType.IDENTIFIER,
+            TokenType.TRUE,
+            TokenType.IDENTIFIER,
+            TokenType.WHILE,
+            TokenType.IDENTIFIER,
+            TokenType.EOF,
+        )
+    }
+
+    @Test
+    fun `scans all comparison operators`() {
+        val tokens = Lexer("a==b a!=b a<b a<=b a>b a>=b").scanTokens()
+
+        assertTokenTypes(
+            tokens,
+            TokenType.IDENTIFIER, TokenType.EQUAL_EQUAL, TokenType.IDENTIFIER,
+            TokenType.IDENTIFIER, TokenType.NOT_EQUAL, TokenType.IDENTIFIER,
+            TokenType.IDENTIFIER, TokenType.LESS, TokenType.IDENTIFIER,
+            TokenType.IDENTIFIER, TokenType.LESS_EQUAL, TokenType.IDENTIFIER,
+            TokenType.IDENTIFIER, TokenType.GREATER, TokenType.IDENTIFIER,
+            TokenType.IDENTIFIER, TokenType.GREATER_EQUAL, TokenType.IDENTIFIER,
+            TokenType.EOF,
+        )
+    }
+
+    @Test
+    fun `tracks line numbers across newlines`() {
+        val tokens = Lexer("x = 1\ny = 2\nz = 3").scanTokens()
+
+        assertEquals(1, tokens[0].line) // x
+        assertEquals(2, tokens[4].line) // y
+        assertEquals(3, tokens[8].line) // z
+    }
+
+    @Test
+    fun `fails on unexpected character`() {
+        val error = assertFailsWith<LexerException> {
+            Lexer("@").scanTokens()
+        }
+
+        assertTrue(error.message!!.contains("Unexpected character '@'"))
     }
 
     private fun assertTokenTypes(tokens: List<Token>, vararg expected: TokenType) {

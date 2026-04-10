@@ -84,6 +84,86 @@ class InterpreterTest {
         assertEquals(2, globals["y"])
     }
 
+    @Test
+    fun `function can read global variable`() {
+        val program = parseProgram("""
+        x = 10
+        fun add_to_x(a) { return a + x }
+        y = add_to_x(5)
+    """.trimIndent())
+
+        val globals = Interpreter().interpret(program)
+
+        assertEquals(10, globals["x"])
+        assertEquals(15, globals["y"])
+    }
+
+    @Test
+    fun `function local assignment does not overwrite global variable`() {
+        val program = parseProgram("""
+        x = 10
+        fun f() { x = 99, return x }
+        y = f()
+    """.trimIndent())
+
+        val globals = Interpreter().interpret(program)
+
+        assertEquals(10, globals["x"])
+        assertEquals(99, globals["y"])
+    }
+
+    @Test
+    fun `function parameter shadows global variable`() {
+        val program = parseProgram("""
+        x = 7
+        fun f(x) { return x + 1 }
+        y = f(20)
+    """.trimIndent())
+
+        val globals = Interpreter().interpret(program)
+
+        assertEquals(7, globals["x"])
+        assertEquals(21, globals["y"])
+    }
+
+    @Test
+    fun `nested calls work correctly`() {
+        val program = parseProgram("""
+        fun add(a, b) { return a + b }
+        fun twice(x) { return add(x, x) }
+        y = twice(6)
+    """.trimIndent())
+
+        val globals = Interpreter().interpret(program)
+
+        assertEquals(12, globals["y"])
+    }
+
+    @Test
+    fun `equality works for booleans`() {
+        val program = parseProgram("""
+        x = true == false
+        y = true != false
+    """.trimIndent())
+
+        val globals = Interpreter().interpret(program)
+
+        assertEquals(false, globals["x"])
+        assertEquals(true, globals["y"])
+    }
+
+    @Test
+    fun `while loop can execute zero times`() {
+        val program = parseProgram("""
+        x = 10
+        while false do x = 20
+    """.trimIndent())
+
+        val globals = Interpreter().interpret(program)
+
+        assertEquals(10, globals["x"])
+    }
+
     private fun parseProgram(source: String): List<Stmt> {
         val tokens = Lexer(source).scanTokens()
         return Parser(tokens).parseProgram()

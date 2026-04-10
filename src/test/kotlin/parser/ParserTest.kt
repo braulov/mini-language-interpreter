@@ -7,6 +7,7 @@ import lexer.TokenType
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class ParserTest {
 
@@ -210,6 +211,87 @@ class ParserTest {
 
         assertIs<Stmt.If>(body.statements[0])
         assertIs<Stmt.Assignment>(body.statements[1])
+    }
+    @Test
+    fun `parses nested function calls`() {
+        val expr = parseExpression("f(g(1), h(2, 3))")
+
+        val call = assertIs<Expr.Call>(expr)
+        assertEquals("f", call.callee.lexeme)
+        assertEquals(2, call.arguments.size)
+
+        val first = assertIs<Expr.Call>(call.arguments[0])
+        assertEquals("g", first.callee.lexeme)
+
+        val second = assertIs<Expr.Call>(call.arguments[1])
+        assertEquals("h", second.callee.lexeme)
+        assertEquals(2, second.arguments.size)
+    }
+
+    @Test
+    fun `parses chained arithmetic left associatively`() {
+        val expr = parseExpression("1 - 2 - 3")
+
+        val outer = assertIs<Expr.Binary>(expr)
+        assertEquals(TokenType.MINUS, outer.operator.type)
+
+        val left = assertIs<Expr.Binary>(outer.left)
+        assertEquals(TokenType.MINUS, left.operator.type)
+
+        val leftLeft = assertIs<Expr.Literal>(left.left)
+        assertEquals(1, leftLeft.value)
+
+        val leftRight = assertIs<Expr.Literal>(left.right)
+        assertEquals(2, leftRight.value)
+
+        val right = assertIs<Expr.Literal>(outer.right)
+        assertEquals(3, right.value)
+    }
+
+    @Test
+    fun `parses nested if statements`() {
+        val program = parseProgram(
+            "if true then if false then x = 1 else x = 2 else x = 3"
+        )
+
+        val outer = assertIs<Stmt.If>(program.single())
+        val inner = assertIs<Stmt.If>(outer.thenBranch)
+        assertIs<Stmt.Assignment>(inner.thenBranch)
+        assertIs<Stmt.Assignment>(inner.elseBranch)
+        assertIs<Stmt.Assignment>(outer.elseBranch)
+    }
+
+    @Test
+    fun `parses function with empty body`() {
+        val program = parseProgram("fun f() {}")
+
+        val function = assertIs<Stmt.Function>(program.single())
+        val body = assertIs<Stmt.Block>(function.body)
+        assertEquals(0, body.statements.size)
+    }
+
+    @Test
+    fun `parses block body with commas and newlines`() {
+        val program = parseProgram("""
+        fun f() {
+            x = 1,
+            y = 2
+            return y
+        }
+    """.trimIndent())
+
+        val function = assertIs<Stmt.Function>(program.single())
+        val body = assertIs<Stmt.Block>(function.body)
+        assertEquals(3, body.statements.size)
+    }
+
+    @Test
+    fun `fails on assignment without equals`() {
+        val error = kotlin.test.assertFailsWith<ParseException> {
+            parseProgram("x 1")
+        }
+
+        assertTrue(error.message!!.contains("Expected '=' after variable name"))
     }
 
     private fun parseExpression(source: String): Expr {
