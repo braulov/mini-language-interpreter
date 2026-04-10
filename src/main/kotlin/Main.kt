@@ -1,12 +1,10 @@
 package org.example
 
+import org.example.lexer.Token
+
 fun main() {
     val program = generateSequence(::readLine).joinToString("\n")
-    if (program.isNotBlank()) {
-        error("Interpreter is not implemented yet")
-    }
+    println(runProgram(program))
 }
 
-fun runProgram(source: String): String {
-    error("Interpreter is not implemented yet")
-}
+fun runProgram(source: String): String = TODO("Interpreter is not implemented yet")
