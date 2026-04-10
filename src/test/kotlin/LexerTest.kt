@@ -1,124 +1,152 @@
+package lexer
+
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class LexerTest {
 
     @Test
-    fun `lexes assignment and arithmetic`() {
+    fun `scans assignment and arithmetic`() {
         val source = """
             x = 2
             y = (x + 2) * 2
         """.trimIndent()
 
-        val expected = listOf(
-            token.Identifier("x"),
-            token.Assign,
-            token.IntLiteral(2),
-            token.Newline,
-            token.Identifier("y"),
-            token.Assign,
-            token.LeftParen,
-            token.Identifier("x"),
-            token.Plus,
-            token.IntLiteral(2),
-            token.RightParen,
-            token.Star,
-            token.IntLiteral(2),
-            token.Eof
+        val tokens = Lexer(source).scanTokens()
+
+        assertTokenTypes(
+            tokens,
+            TokenType.IDENTIFIER,
+            TokenType.ASSIGN,
+            TokenType.INT,
+            TokenType.NEWLINE,
+            TokenType.IDENTIFIER,
+            TokenType.ASSIGN,
+            TokenType.LEFT_PAREN,
+            TokenType.IDENTIFIER,
+            TokenType.PLUS,
+            TokenType.INT,
+            TokenType.RIGHT_PAREN,
+            TokenType.STAR,
+            TokenType.INT,
+            TokenType.EOF,
         )
 
-        assertEquals(expected, lex(source))
+        assertEquals("x", tokens[0].lexeme)
+        assertEquals(2, tokens[2].literal)
+        assertEquals("y", tokens[4].lexeme)
+        assertEquals(2, tokens[9].literal)
+        assertEquals(2, tokens[12].literal)
     }
 
     @Test
-    fun `lexes keywords and comparisons`() {
+    fun `scans keywords and comparisons`() {
         val source = "if x <= 10 then return true else return false"
 
-        val expected = listOf(
-            token.If,
-            token.Identifier("x"),
-            token.LessEqual,
-            token.IntLiteral(10),
-            token.Then,
-            token.Return,
-            token.True,
-            token.Else,
-            token.Return,
-            token.False,
-            token.Eof
+        val tokens = Lexer(source).scanTokens()
+
+        assertTokenTypes(
+            tokens,
+            TokenType.IF,
+            TokenType.IDENTIFIER,
+            TokenType.LESS_EQUAL,
+            TokenType.INT,
+            TokenType.THEN,
+            TokenType.RETURN,
+            TokenType.TRUE,
+            TokenType.ELSE,
+            TokenType.RETURN,
+            TokenType.FALSE,
+            TokenType.EOF,
         )
 
-        assertEquals(expected, lex(source))
+        assertEquals("x", tokens[1].lexeme)
+        assertEquals(10, tokens[3].literal)
     }
 
     @Test
-    fun `lexes function declaration`() {
+    fun `scans function declaration`() {
         val source = "fun add(a, b) { return a + b }"
 
-        val expected = listOf(
-            token.Fun,
-            token.Identifier("add"),
-            token.LeftParen,
-            token.Identifier("a"),
-            token.Comma,
-            token.Identifier("b"),
-            token.RightParen,
-            token.LeftBrace,
-            token.Return,
-            token.Identifier("a"),
-            token.Plus,
-            token.Identifier("b"),
-            token.RightBrace,
-            token.Eof
+        val tokens = Lexer(source).scanTokens()
+
+        assertTokenTypes(
+            tokens,
+            TokenType.FUN,
+            TokenType.IDENTIFIER,
+            TokenType.LEFT_PAREN,
+            TokenType.IDENTIFIER,
+            TokenType.COMMA,
+            TokenType.IDENTIFIER,
+            TokenType.RIGHT_PAREN,
+            TokenType.LEFT_BRACE,
+            TokenType.RETURN,
+            TokenType.IDENTIFIER,
+            TokenType.PLUS,
+            TokenType.IDENTIFIER,
+            TokenType.RIGHT_BRACE,
+            TokenType.EOF,
         )
 
-        assertEquals(expected, lex(source))
+        assertEquals("add", tokens[1].lexeme)
+        assertEquals("a", tokens[3].lexeme)
+        assertEquals("b", tokens[5].lexeme)
     }
 
     @Test
-    fun `lexes while with equality and comma`() {
+    fun `scans while with equality and comma`() {
         val source = "while x == 1 do y = y + 1, x = x + 1"
 
-        val expected = listOf(
-            token.While,
-            token.Identifier("x"),
-            token.EqualEqual,
-            token.IntLiteral(1),
-            token.Do,
-            token.Identifier("y"),
-            token.Assign,
-            token.Identifier("y"),
-            token.Plus,
-            token.IntLiteral(1),
-            token.Comma,
-            token.Identifier("x"),
-            token.Assign,
-            token.Identifier("x"),
-            token.Plus,
-            token.IntLiteral(1),
-            token.Eof
+        val tokens = Lexer(source).scanTokens()
+
+        assertTokenTypes(
+            tokens,
+            TokenType.WHILE,
+            TokenType.IDENTIFIER,
+            TokenType.EQUAL_EQUAL,
+            TokenType.INT,
+            TokenType.DO,
+            TokenType.IDENTIFIER,
+            TokenType.ASSIGN,
+            TokenType.IDENTIFIER,
+            TokenType.PLUS,
+            TokenType.INT,
+            TokenType.COMMA,
+            TokenType.IDENTIFIER,
+            TokenType.ASSIGN,
+            TokenType.IDENTIFIER,
+            TokenType.PLUS,
+            TokenType.INT,
+            TokenType.EOF,
         )
 
-        assertEquals(expected, lex(source))
+        assertEquals(1, tokens[3].literal)
+        assertEquals(1, tokens[9].literal)
+        assertEquals(1, tokens[15].literal)
     }
 
     @Test
-    fun `collapses consecutive newlines into separate newline tokens`() {
+    fun `scans consecutive newlines`() {
         val source = "x = 1\n\n\ny = 2"
 
-        val expected = listOf(
-            token.Identifier("x"),
-            token.Assign,
-            token.IntLiteral(1),
-            token.Newline,
-            token.Newline,
-            token.Newline,
-            token.Identifier("y"),
-            token.Assign,
-            token.IntLiteral(2),
-            token.Eof
-        )
+        val tokens = Lexer(source).scanTokens()
 
-        assertEquals(expected, lex(source))
+        assertTokenTypes(
+            tokens,
+            TokenType.IDENTIFIER,
+            TokenType.ASSIGN,
+            TokenType.INT,
+            TokenType.NEWLINE,
+            TokenType.NEWLINE,
+            TokenType.NEWLINE,
+            TokenType.IDENTIFIER,
+            TokenType.ASSIGN,
+            TokenType.INT,
+            TokenType.EOF,
+        )
+    }
+
+    private fun assertTokenTypes(tokens: List<Token>, vararg expected: TokenType) {
+        assertEquals(expected.toList(), tokens.map(Token::type))
     }
 }

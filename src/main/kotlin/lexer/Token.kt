@@ -1,39 +1,28 @@
-package org.example.lexer
+package lexer
 
-sealed interface Token {
-    data class IntLiteral(val value: Int) : Token
-    data class Identifier(val name: String) : Token
+data class Token(
+    val type: TokenType,
+    val lexeme: String,
+    val literal: Any? = null,
+    val line: Int,
+)
 
-    data object True : Token
-    data object False : Token
+enum class TokenType {
+    IDENTIFIER, INT,
 
-    data object Fun : Token
-    data object Return : Token
-    data object If : Token
-    data object Then : Token
-    data object Else : Token
-    data object While : Token
-    data object Do : Token
+    TRUE, FALSE, FUN, RETURN,
+    IF, THEN, ELSE, WHILE,
+    DO,
 
-    data object Plus : Token
-    data object Minus : Token
-    data object Star : Token
-    data object Slash : Token
+    PLUS, MINUS, STAR, SLASH,
 
-    data object Assign : Token
-    data object EqualEqual : Token
-    data object NotEqual : Token
-    data object Less : Token
-    data object LessEqual : Token
-    data object Greater : Token
-    data object GreaterEqual : Token
+    ASSIGN, EQUAL_EQUAL, NOT_EQUAL,
+    LESS, LESS_EQUAL, GREATER,
+    GREATER_EQUAL,
 
-    data object LeftParen : Token
-    data object RightParen : Token
-    data object LeftBrace : Token
-    data object RightBrace : Token
-    data object Comma : Token
+    LEFT_PAREN, RIGHT_PAREN,
+    LEFT_BRACE, RIGHT_BRACE,
+    COMMA,
 
-    data object Newline : Token
-    data object Eof : Token
+    NEWLINE, EOF,
 }

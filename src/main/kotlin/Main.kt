@@ -1,7 +1,5 @@
 package org.example
 
-import org.example.lexer.Token
-
 fun main() {
     val program = generateSequence(::readLine).joinToString("\n")
     println(runProgram(program))
