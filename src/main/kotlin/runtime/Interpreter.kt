@@ -18,9 +18,9 @@ class Interpreter {
     private fun execute(statement: Stmt) {
         when (statement) {
             is Stmt.Assignment -> executeAssignment(statement)
+            is Stmt.If -> executeIf(statement)
 
             is Stmt.Block,
-            is Stmt.If,
             is Stmt.While,
             is Stmt.Function,
             is Stmt.Return -> {
@@ -34,6 +34,16 @@ class Interpreter {
     private fun executeAssignment(statement: Stmt.Assignment) {
         val value = evaluate(statement.value)
         globals.assign(statement.name.lexeme, value)
+    }
+
+    private fun executeIf(statement: Stmt.If) {
+        val condition = evaluate(statement.condition)
+
+        if (condition.asBoolean()) {
+            execute(statement.thenBranch)
+        } else {
+            execute(statement.elseBranch)
+        }
     }
 
     private fun evaluate(expression: Expr): Any {
@@ -90,4 +100,9 @@ class Interpreter {
 private fun Any.asInt(): Int {
     return this as? Int
         ?: throw RuntimeException("Expected integer value, got ${this::class.simpleName}.")
+}
+
+private fun Any.asBoolean(): Boolean {
+    return this as? Boolean
+        ?: throw RuntimeException("Expected boolean value, got ${this::class.simpleName}.")
 }
