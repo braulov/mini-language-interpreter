@@ -1,14 +1,17 @@
 package runtime
 
-class Environment {
+class Environment(
+    private val enclosing: Environment? = null,
+) {
     private val values = LinkedHashMap<String, Any>()
 
-    fun assign(name: String, value: Any) {
+    fun assignLocal(name: String, value: Any) {
         values[name] = value
     }
 
     fun get(name: String): Any {
-        return values[name]
+        values[name]?.let { return it }
+        return enclosing?.get(name)
             ?: throw RuntimeException("Undefined variable '$name'.")
     }
 
