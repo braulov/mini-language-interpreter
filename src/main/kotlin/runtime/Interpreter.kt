@@ -16,6 +16,7 @@ class Interpreter : Expr.Visitor<Any>, Stmt.Visitor<Unit> {
         for (statement in program) {
             execute(statement)
         }
+
         return globals.snapshot()
     }
 
@@ -34,6 +35,7 @@ class Interpreter : Expr.Visitor<Any>, Stmt.Visitor<Unit> {
 
     override fun visitIf(stmt: Stmt.If) {
         val condition = evaluate(stmt.condition)
+
         if (condition.asBoolean(tokenOf(stmt.condition))) {
             execute(stmt.thenBranch)
         } else {
@@ -67,7 +69,8 @@ class Interpreter : Expr.Visitor<Any>, Stmt.Visitor<Unit> {
     }
 
     override fun visitLiteral(expr: Expr.Literal): Any {
-        return expr.value ?: throw RuntimeException("Null literals are not supported.")
+        return expr.value
+            ?: throw RuntimeException("Null literals are not supported.")
     }
 
     override fun visitVariable(expr: Expr.Variable): Any {
@@ -95,6 +98,7 @@ class Interpreter : Expr.Visitor<Any>, Stmt.Visitor<Unit> {
             TokenType.PLUS -> left.asInt(expr.operator) + right.asInt(expr.operator)
             TokenType.MINUS -> left.asInt(expr.operator) - right.asInt(expr.operator)
             TokenType.STAR -> left.asInt(expr.operator) * right.asInt(expr.operator)
+
             TokenType.SLASH -> {
                 val divisor = right.asInt(expr.operator)
                 if (divisor == 0) {
@@ -102,6 +106,7 @@ class Interpreter : Expr.Visitor<Any>, Stmt.Visitor<Unit> {
                 }
                 left.asInt(expr.operator) / divisor
             }
+
             TokenType.EQUAL_EQUAL -> left == right
             TokenType.NOT_EQUAL -> left != right
 
@@ -149,12 +154,12 @@ class Interpreter : Expr.Visitor<Any>, Stmt.Visitor<Unit> {
 
     private fun tokenOf(expr: Expr): Token {
         return when (expr) {
+            is Expr.Literal -> expr.token
             is Expr.Variable -> expr.name
             is Expr.Unary -> expr.operator
             is Expr.Binary -> expr.operator
             is Expr.Call -> expr.callee
             is Expr.Grouping -> tokenOf(expr.expression)
-            is Expr.Literal -> Token(TokenType.INT, "<literal>", expr.value, 0)
         }
     }
 }

@@ -104,6 +104,27 @@ class InterpreterNegativeTest {
     }
 
     @Test
+    fun `fails on division by zero`() {
+        val error = assertFailsWith<RuntimeError> {
+            interpret("x = 1 / 0")
+        }
+
+        assertTrue(error.message!!.contains("Division by zero"))
+    }
+
+    @Test
+    fun `reports line number for literal condition type error`() {
+        val error = assertFailsWith<RuntimeError> {
+            interpret("""
+                x = 1
+                if 1 then y = 2 else y = 3
+            """.trimIndent())
+        }
+
+        assertTrue(error.message!!.contains("line 2"))
+    }
+
+    @Test
     fun `fails on parser error for missing parenthesis`() {
         val error = assertFailsWith<ParseException> {
             parseProgram("x = (1 + 2")
