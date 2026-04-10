@@ -4,123 +4,96 @@ import ast.Expr
 import ast.Stmt
 import lexer.TokenType
 
-class Interpreter {
+class Interpreter : Expr.Visitor<Any>, Stmt.Visitor<Unit> {
     private val globals = Environment()
     private val functions = mutableMapOf<String, Stmt.Function>()
 
+    private var environment: Environment = globals
+    private var insideFunction: Boolean = false
+
     fun interpret(program: List<Stmt>): Map<String, Any> {
         for (statement in program) {
-            execute(statement, globals, insideFunction = false)
+            execute(statement)
         }
 
         return globals.snapshot()
     }
 
-    private fun execute(
-        statement: Stmt,
-        environment: Environment,
-        insideFunction: Boolean,
-    ) {
-        when (statement) {
-            is Stmt.Assignment -> executeAssignment(statement, environment)
-            is Stmt.If -> executeIf(statement, environment, insideFunction)
-            is Stmt.While -> executeWhile(statement, environment, insideFunction)
-            is Stmt.Block -> executeBlock(statement, environment, insideFunction)
-            is Stmt.Function -> executeFunctionDeclaration(statement)
-            is Stmt.Return -> executeReturn(statement, environment, insideFunction)
-        }
+    private fun execute(statement: Stmt) {
+        statement.accept(this)
     }
 
-    private fun executeAssignment(
-        statement: Stmt.Assignment,
-        environment: Environment,
-    ) {
-        val value = evaluate(statement.value, environment)
-        environment.assignLocal(statement.name.lexeme, value)
+    private fun evaluate(expression: Expr): Any {
+        return expression.accept(this)
     }
 
-    private fun executeIf(
-        statement: Stmt.If,
-        environment: Environment,
-        insideFunction: Boolean,
-    ) {
-        val condition = evaluate(statement.condition, environment)
+    override fun visitAssignment(stmt: Stmt.Assignment) {
+        val value = evaluate(stmt.value)
+        environment.assignLocal(stmt.name.lexeme, value)
+    }
+
+    override fun visitIf(stmt: Stmt.If) {
+        val condition = evaluate(stmt.condition)
 
         if (condition.asBoolean()) {
-            execute(statement.thenBranch, environment, insideFunction)
+            execute(stmt.thenBranch)
         } else {
-            execute(statement.elseBranch, environment, insideFunction)
+            execute(stmt.elseBranch)
         }
     }
 
-    private fun executeWhile(
-        statement: Stmt.While,
-        environment: Environment,
-        insideFunction: Boolean,
-    ) {
-        while (evaluate(statement.condition, environment).asBoolean()) {
-            execute(statement.body, environment, insideFunction)
+    override fun visitWhile(stmt: Stmt.While) {
+        while (evaluate(stmt.condition).asBoolean()) {
+            execute(stmt.body)
         }
     }
 
-    private fun executeBlock(
-        statement: Stmt.Block,
-        environment: Environment,
-        insideFunction: Boolean,
-    ) {
-        for (nested in statement.statements) {
-            execute(nested, environment, insideFunction)
+    override fun visitBlock(stmt: Stmt.Block) {
+        for (nested in stmt.statements) {
+            execute(nested)
         }
     }
 
-    private fun executeFunctionDeclaration(statement: Stmt.Function) {
-        functions[statement.name.lexeme] = statement
+    override fun visitFunction(stmt: Stmt.Function) {
+        functions[stmt.name.lexeme] = stmt
     }
 
-    private fun executeReturn(
-        statement: Stmt.Return,
-        environment: Environment,
-        insideFunction: Boolean,
-    ) {
+    override fun visitReturn(stmt: Stmt.Return) {
         if (!insideFunction) {
             throw RuntimeException("Return is only allowed inside a function.")
         }
 
-        val value = evaluate(statement.value, environment)
+        val value = evaluate(stmt.value)
         throw ReturnSignal(value)
     }
 
-    private fun evaluate(expression: Expr, environment: Environment): Any {
-        return when (expression) {
-            is Expr.Literal -> expression.value
-                ?: throw RuntimeException("Null literals are not supported.")
-
-            is Expr.Variable -> environment.get(expression.name.lexeme)
-
-            is Expr.Grouping -> evaluate(expression.expression, environment)
-
-            is Expr.Unary -> evaluateUnary(expression, environment)
-
-            is Expr.Binary -> evaluateBinary(expression, environment)
-
-            is Expr.Call -> evaluateCall(expression, environment)
-        }
+    override fun visitLiteral(expr: Expr.Literal): Any {
+        return expr.value
+            ?: throw RuntimeException("Null literals are not supported.")
     }
 
-    private fun evaluateUnary(expression: Expr.Unary, environment: Environment): Any {
-        val right = evaluate(expression.right, environment)
+    override fun visitVariable(expr: Expr.Variable): Any {
+        return environment.get(expr.name.lexeme)
+    }
 
-        return when (expression.operator.type) {
+    override fun visitGrouping(expr: Expr.Grouping): Any {
+        return evaluate(expr.expression)
+    }
+
+    override fun visitUnary(expr: Expr.Unary): Any {
+        val right = evaluate(expr.right)
+
+        return when (expr.operator.type) {
             TokenType.MINUS -> -right.asInt()
-            else -> throw RuntimeException("Unsupported unary operator: ${expression.operator.lexeme}")
+            else -> throw RuntimeException("Unsupported unary operator: ${expr.operator.lexeme}")
         }
     }
 
-    private fun evaluateBinary(expression: Expr.Binary, environment: Environment): Any {
-        val left = evaluate(expression.left, environment)
-        val right = evaluate(expression.right, environment)
+    override fun visitBinary(expr: Expr.Binary): Any {
+        val left = evaluate(expr.left)
+        val right = evaluate(expr.right)
 
-        return when (expression.operator.type) {
+        return when (expr.operator.type) {
             TokenType.PLUS -> left.asInt() + right.asInt()
             TokenType.MINUS -> left.asInt() - right.asInt()
             TokenType.STAR -> left.asInt() * right.asInt()
@@ -134,32 +107,41 @@ class Interpreter {
             TokenType.GREATER -> left.asInt() > right.asInt()
             TokenType.GREATER_EQUAL -> left.asInt() >= right.asInt()
 
-            else -> throw RuntimeException("Unsupported binary operator: ${expression.operator.lexeme}")
+            else -> throw RuntimeException("Unsupported binary operator: ${expr.operator.lexeme}")
         }
     }
 
-    private fun evaluateCall(expression: Expr.Call, callerEnvironment: Environment): Any {
-        val function = functions[expression.callee.lexeme]
-            ?: throw RuntimeException("Undefined function '${expression.callee.lexeme}'.")
+    override fun visitCall(expr: Expr.Call): Any {
+        val function = functions[expr.callee.lexeme]
+            ?: throw RuntimeException("Undefined function '${expr.callee.lexeme}'.")
 
-        if (expression.arguments.size != function.parameters.size) {
+        if (expr.arguments.size != function.parameters.size) {
             throw RuntimeException(
-                "Function '${function.name.lexeme}' expected ${function.parameters.size} arguments but got ${expression.arguments.size}."
+                "Function '${function.name.lexeme}' expected ${function.parameters.size} arguments but got ${expr.arguments.size}."
             )
         }
 
+        val callerEnvironment = environment
+        val callerInsideFunction = insideFunction
+
         val localEnvironment = Environment(globals)
 
-        for ((parameter, argumentExpression) in function.parameters.zip(expression.arguments)) {
-            val argumentValue = evaluate(argumentExpression, callerEnvironment)
+        for ((parameter, argumentExpression) in function.parameters.zip(expr.arguments)) {
+            val argumentValue = evaluate(argumentExpression)
             localEnvironment.assignLocal(parameter.lexeme, argumentValue)
         }
 
         return try {
-            execute(function.body, localEnvironment, insideFunction = true)
+            environment = localEnvironment
+            insideFunction = true
+
+            execute(function.body)
             throw RuntimeException("Function '${function.name.lexeme}' did not return a value.")
         } catch (signal: ReturnSignal) {
             signal.value
+        } finally {
+            environment = callerEnvironment
+            insideFunction = callerInsideFunction
         }
     }
 }
